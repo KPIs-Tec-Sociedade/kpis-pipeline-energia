@@ -1,7 +1,7 @@
 resources:
   jobs:
     kpis_energia_job:
-      name: "[${bundle.target}] kpis_energia_job"
+      name: "kpis_energia_job"
 
       parameters:
         - name: catalog
