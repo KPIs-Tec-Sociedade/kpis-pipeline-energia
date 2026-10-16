@@ -1,0 +1,6 @@
+resources:
+  dashboards:
+    dashboard_inteligencia_mercado:
+      display_name: "Dashboard Executivo - Inteligência de Mercado"
+      file_path: ../src/dashboards/mercado_energia.lvdash.json
+      warehouse_id: "5780d8e299f26aa9"
