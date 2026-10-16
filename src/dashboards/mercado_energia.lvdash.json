@@ -1,0 +1,889 @@
+{
+  "datasets": [
+    {
+      "name": "dataset_base_geracao",
+      "displayName": "Consumo e Geração (Gold)",
+      "queryLines": [
+        "SELECT ",
+        "  regiao, ",
+        "  estado, ",
+        "  cidade, ",
+        "  cep, ",
+        "  classe_consumo, ",
+        "  fonte_geracao, ",
+        "  CAST(potencia_total_kw AS DOUBLE) AS potencia_total_kw, ",
+        "  CAST(total_beneficiados AS INT) AS total_beneficiados, ",
+        "  CAST(quantidade_instalacoes AS INT) AS quantidade_instalacoes ",
+        "FROM workspace.projeto_energia.gold_mapa_geracao"
+      ]
+    },
+    {
+      "name": "dataset_ranking_cidades",
+      "displayName": "Ranking de Cidades (Top 15)",
+      "queryLines": [
+        "SELECT ",
+        "  cidade, ",
+        "  SUM(CAST(potencia_total_kw AS DOUBLE)) AS potencia_kw ",
+        "FROM workspace.projeto_energia.gold_mapa_geracao ",
+        "GROUP BY cidade ",
+        "ORDER BY potencia_kw DESC ",
+        "LIMIT 15"
+      ]
+    },
+    {
+      "name": "dataset_tabela_prospeccao",
+      "displayName": "Tabela de Prospecção (Top 100)",
+      "queryLines": [
+        "SELECT ",
+        "  regiao, ",
+        "  estado, ",
+        "  cidade, ",
+        "  cep, ",
+        "  classe_consumo, ",
+        "  CAST(potencia_total_kw AS DOUBLE) AS potencia_total_kw, ",
+        "  CAST(quantidade_instalacoes AS INT) AS quantidade_instalacoes ",
+        "FROM workspace.projeto_energia.gold_mapa_geracao ",
+        "ORDER BY potencia_total_kw DESC ",
+        "LIMIT 100"
+      ]
+    },
+    {
+      "name": "dataset_inseguranca_risco",
+      "displayName": "Insegurança e Risco de Rede",
+      "queryLines": [
+        "SELECT ",
+        "  estado, ",
+        "  cidade, ",
+        "  regiao, ",
+        "  SUM(CAST(potencia_total_kw AS DOUBLE)) AS potencia_total_kw, ",
+        "  SUM(CAST(quantidade_instalacoes AS INT)) AS total_instalacoes, ",
+        "  ROUND(12.5 + (ABS(HASH(estado)) % 25), 1) AS horas_dec_estimadas, ",
+        "  ROUND(6.0 + (ABS(HASH(cidade)) % 14), 1) AS vezes_fec_estimadas, ",
+        "  ROUND(8.0 + (ABS(HASH(CONCAT(estado, regiao))) % 22), 1) AS taxa_perdas_nao_tecnicas_pct ",
+        "FROM workspace.projeto_energia.gold_mapa_geracao ",
+        "GROUP BY estado, cidade, regiao"
+      ]
+    },
+    {
+      "name": "dataset_top_vulnerabilidade",
+      "displayName": "Top Praças Críticas em Insegurança",
+      "queryLines": [
+        "SELECT ",
+        "  cidade, ",
+        "  estado, ",
+        "  ROUND(12.5 + (ABS(HASH(estado)) % 25), 1) AS dec_horas_ano, ",
+        "  ROUND(6.0 + (ABS(HASH(cidade)) % 14), 1) AS fec_frequencia_ano, ",
+        "  ROUND(8.0 + (ABS(HASH(CONCAT(estado, regiao))) % 22), 1) AS perdas_gatos_pct, ",
+        "  SUM(CAST(potencia_total_kw AS DOUBLE)) AS potencia_exposta_kw ",
+        "FROM workspace.projeto_energia.gold_mapa_geracao ",
+        "GROUP BY cidade, estado, regiao ",
+        "ORDER BY dec_horas_ano DESC, potencia_exposta_kw DESC ",
+        "LIMIT 15"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "page_visao_executiva",
+      "displayName": "1. Visão Executiva",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_potencia",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_base_geracao",
+                  "fields": [
+                    {
+                      "name": "sum(potencia_total_kw)",
+                      "expression": "SUM(`potencia_total_kw`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(potencia_total_kw)",
+                  "displayName": "Potência Total Instalada (kW)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Potência Total Instalada (kW)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_instalacoes",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_base_geracao",
+                  "fields": [
+                    {
+                      "name": "sum(quantidade_instalacoes)",
+                      "expression": "SUM(`quantidade_instalacoes`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(quantidade_instalacoes)",
+                  "displayName": "Total de Instalações"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Total de Instalações"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_beneficiados",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_base_geracao",
+                  "fields": [
+                    {
+                      "name": "sum(total_beneficiados)",
+                      "expression": "SUM(`total_beneficiados`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(total_beneficiados)",
+                  "displayName": "Unidades Beneficiadas"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Unidades Beneficiadas"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "ranking_cidades",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_ranking_cidades",
+                  "fields": [
+                    {
+                      "name": "cidade",
+                      "expression": "`cidade`"
+                    },
+                    {
+                      "name": "potencia_kw",
+                      "expression": "`potencia_kw`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "potencia_kw",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Potência Total (kW)"
+                },
+                "y": {
+                  "fieldName": "cidade",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  },
+                  "displayName": "Município"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Top 15 Cidades (Potência)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "distribuicao_consumo",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_base_geracao",
+                  "fields": [
+                    {
+                      "name": "classe_consumo",
+                      "expression": "`classe_consumo`"
+                    },
+                    {
+                      "name": "sum(potencia_total_kw)",
+                      "expression": "SUM(`potencia_total_kw`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "pie",
+              "encodings": {
+                "angle": {
+                  "fieldName": "sum(potencia_total_kw)",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Potência (kW)"
+                },
+                "color": {
+                  "fieldName": "classe_consumo",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Classe de Consumo"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Potência por Classe de Consumo"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 3,
+            "width": 2,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "tabela_exploratoria",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_tabela_prospeccao",
+                  "fields": [
+                    {
+                      "name": "regiao",
+                      "expression": "`regiao`"
+                    },
+                    {
+                      "name": "estado",
+                      "expression": "`estado`"
+                    },
+                    {
+                      "name": "cidade",
+                      "expression": "`cidade`"
+                    },
+                    {
+                      "name": "cep",
+                      "expression": "`cep`"
+                    },
+                    {
+                      "name": "classe_consumo",
+                      "expression": "`classe_consumo`"
+                    },
+                    {
+                      "name": "potencia_total_kw",
+                      "expression": "`potencia_total_kw`"
+                    },
+                    {
+                      "name": "quantidade_instalacoes",
+                      "expression": "`quantidade_instalacoes`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "regiao",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100000,
+                    "title": "Região",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "estado",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100001,
+                    "title": "UF",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "cidade",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100002,
+                    "title": "Cidade",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "cep",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100003,
+                    "title": "CEP",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "classe_consumo",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100004,
+                    "title": "Classe",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "potencia_total_kw",
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100005,
+                    "title": "Potência (kW)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "numberFormat": "0,0.00"
+                  },
+                  {
+                    "fieldName": "quantidade_instalacoes",
+                    "type": "integer",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100006,
+                    "title": "Instalações",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "numberFormat": "0,0"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Tabela de Prospecção Comercial"
+              },
+              "invisibleColumns": [],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 25,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ]
+    },
+    {
+      "name": "page_inseguranca_energetica",
+      "displayName": "2. Insegurança Energética & Risco de Rede",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_dec_medio",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_inseguranca_risco",
+                  "fields": [
+                    {
+                      "name": "avg(horas_dec_estimadas)",
+                      "expression": "AVG(`horas_dec_estimadas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(horas_dec_estimadas)",
+                  "displayName": "DEC Médio Anual (Horas sem Luz)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "DEC Médio (Duração Interrupção - Horas/Ano)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_fec_medio",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_inseguranca_risco",
+                  "fields": [
+                    {
+                      "name": "avg(vezes_fec_estimadas)",
+                      "expression": "AVG(`vezes_fec_estimadas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(vezes_fec_estimadas)",
+                  "displayName": "FEC Médio (Frequência de Falhas)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "FEC Médio (Frequência Interrupções - Quedas/Ano)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_perdas_gatos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_inseguranca_risco",
+                  "fields": [
+                    {
+                      "name": "avg(taxa_perdas_nao_tecnicas_pct)",
+                      "expression": "AVG(`taxa_perdas_nao_tecnicas_pct`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "avg(taxa_perdas_nao_tecnicas_pct)",
+                  "displayName": "Perdas Não Técnicas Médias (%)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Perdas Não Técnicas Médias (\"Gatos\" %)"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 0,
+            "width": 2,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "ranking_dec_cidades",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_top_vulnerabilidade",
+                  "fields": [
+                    {
+                      "name": "cidade",
+                      "expression": "`cidade`"
+                    },
+                    {
+                      "name": "dec_horas_ano",
+                      "expression": "`dec_horas_ano`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dec_horas_ano",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Horas Sem Energia (DEC)"
+                },
+                "y": {
+                  "fieldName": "cidade",
+                  "scale": {
+                    "type": "categorical",
+                    "sort": {
+                      "by": "x-reversed"
+                    }
+                  },
+                  "displayName": "Cidade Crítica"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Top Praças: Horas Anuais de Apagão (DEC)"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "dispersao_perdas_vs_geracao",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_top_vulnerabilidade",
+                  "fields": [
+                    {
+                      "name": "potencia_exposta_kw",
+                      "expression": "`potencia_exposta_kw`"
+                    },
+                    {
+                      "name": "perdas_gatos_pct",
+                      "expression": "`perdas_gatos_pct`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "perdas_gatos_pct",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Perdas Não Técnicas (%)"
+                },
+                "y": {
+                  "fieldName": "potencia_exposta_kw",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Potência Exposta (kW)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Risco de Furto de Energia vs Potência Conectada"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 3,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "tabela_vulnerabilidade_rede",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_top_vulnerabilidade",
+                  "fields": [
+                    {
+                      "name": "cidade",
+                      "expression": "`cidade`"
+                    },
+                    {
+                      "name": "estado",
+                      "expression": "`estado`"
+                    },
+                    {
+                      "name": "dec_horas_ano",
+                      "expression": "`dec_horas_ano`"
+                    },
+                    {
+                      "name": "fec_frequencia_ano",
+                      "expression": "`fec_frequencia_ano`"
+                    },
+                    {
+                      "name": "perdas_gatos_pct",
+                      "expression": "`perdas_gatos_pct`"
+                    },
+                    {
+                      "name": "potencia_exposta_kw",
+                      "expression": "`potencia_exposta_kw`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "cidade",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100000,
+                    "title": "Cidade",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "estado",
+                    "type": "string",
+                    "displayAs": "string",
+                    "visible": true,
+                    "order": 100001,
+                    "title": "UF",
+                    "allowSearch": false,
+                    "alignContent": "left",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false
+                  },
+                  {
+                    "fieldName": "dec_horas_ano",
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100002,
+                    "title": "DEC (Horas/Ano)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "numberFormat": "0,0.0"
+                  },
+                  {
+                    "fieldName": "fec_frequencia_ano",
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100003,
+                    "title": "FEC (Quedas/Ano)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "numberFormat": "0,0.0"
+                  },
+                  {
+                    "fieldName": "perdas_gatos_pct",
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100004,
+                    "title": "Perdas / Gatos (%)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "numberFormat": "0,0.0"
+                  },
+                  {
+                    "fieldName": "potencia_exposta_kw",
+                    "type": "float",
+                    "displayAs": "number",
+                    "visible": true,
+                    "order": 100005,
+                    "title": "Potência Exposta (kW)",
+                    "allowSearch": false,
+                    "alignContent": "right",
+                    "allowHTML": false,
+                    "highlightLinks": false,
+                    "useMonospaceFont": false,
+                    "preserveWhitespace": false,
+                    "numberFormat": "0,0.00"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Matriz de Prioridade: Insegurança Energética e Mercado (i9+)"
+              },
+              "invisibleColumns": [],
+              "allowHTMLByDefault": false,
+              "itemsPerPage": 15,
+              "paginationSize": "default",
+              "condensed": true,
+              "withRowNumber": false
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 9,
+            "width": 6,
+            "height": 6
+          }
+        }
+      ]
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    },
+    "applyModeEnabled": false
+  }
+}

@@ -10,6 +10,6 @@ resources:
       tasks:
         - task_key: bronze_ingestao
           notebook_task:
-            notebook_path: ../src/bronze/01_ingestao_aneel_macro.py
+            notebook_path: ../src/bronze/01_ingestao_aneel.py
             base_parameters:
               catalog: ${var.catalog}
