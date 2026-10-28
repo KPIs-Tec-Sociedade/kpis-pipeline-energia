@@ -1,15 +1,62 @@
 resources:
   jobs:
     kpis_energia_job:
-      name: "kpis_energia_job"
+      name: "[${bundle.target}] kpis_energia_job"
+      schedule:
+        quartz_cron_expression: 32 0 0 * * ?
+        timezone_id: America/Sao_Paulo
+        pause_status: UNPAUSED
+      max_concurrent_runs: 4
+      tasks:
+        # Ingestão ANEEL (Geração Distribuída)
+        - task_key: bronze_ingestao_micro
+          notebook_task:
+            notebook_path: ../src/bronze/01_ingestao_aneel_micro.py
+            base_parameters:
+              catalog: ${var.catalog}
 
+        # Ingestão ONS (Carga do Sistema para o Duck Curve)
+        - task_key: bronze_ingestao_macro
+          notebook_task:
+            notebook_path: ../src/bronze/01_ingestao_aneel_macro.py
+            base_parameters:
+              catalog: ${var.catalog}
+
+        # Transformação e Limpeza Silver
+        - task_key: silver_transformacao
+          depends_on:
+            - task_key: bronze_ingestao_micro
+          notebook_task:
+            notebook_path: ../src/silver/Silver.ipynb
+          environment_key: Default
+
+        # Agregação Gold + Machine Learning
+        - task_key: gold_agregacao
+          depends_on:
+            - task_key: silver_transformacao
+            - task_key: bronze_ingestao_macro
+          notebook_task:
+            notebook_path: ../src/gold/Gold.ipynb
+          environment_key: Default
+
+        # Atualização Automática do Dashboard Lakeview
+        - task_key: dashboard_atualizacao
+          depends_on:
+            - task_key: gold_agregacao
+          dashboard_task:
+            subscription: {}
+            warehouse_id: "5780d8e299f26aa9"
+            dashboard_id: ${resources.dashboards.dashboard_inteligencia_mercado.id}
+
+      tags:
+        env: ${bundle.target}
+      queue:
+        enabled: true
       parameters:
         - name: catalog
           default: ${var.catalog}
-
-      tasks:
-        - task_key: bronze_ingestao
-          notebook_task:
-            notebook_path: ../src/bronze/01_ingestao_aneel.py
-            base_parameters:
-              catalog: ${var.catalog}
+      environments:
+        - environment_key: Default
+          spec:
+            environment_version: "6"
+      performance_target: PERFORMANCE_OPTIMIZED

@@ -4,81 +4,56 @@
       "name": "dataset_base_geracao",
       "displayName": "Consumo e Geração (Gold)",
       "queryLines": [
-        "SELECT ",
-        "  regiao, ",
-        "  estado, ",
-        "  cidade, ",
-        "  cep, ",
-        "  classe_consumo, ",
-        "  fonte_geracao, ",
-        "  CAST(potencia_total_kw AS DOUBLE) AS potencia_total_kw, ",
-        "  CAST(total_beneficiados AS INT) AS total_beneficiados, ",
-        "  CAST(quantidade_instalacoes AS INT) AS quantidade_instalacoes ",
-        "FROM workspace.projeto_energia.gold_mapa_geracao"
+        "SELECT regiao, estado, cidade, CONCAT(SUBSTRING(cep, 1, 5), '-***') AS cep_mascarado, CASE WHEN classe_consumo IN ('Comercial', 'Industrial', 'Rural', 'Residencial') THEN classe_consumo ELSE 'Outros' END AS classe_agrupada, CAST(potencia_total_kw AS DOUBLE) AS potencia_total_kw, CAST(total_beneficiados AS INT) AS total_beneficiados, CAST(quantidade_instalacoes AS INT) AS quantidade_instalacoes FROM workspace.projeto_energia.gold_mapa_geracao"
       ]
     },
     {
       "name": "dataset_ranking_cidades",
       "displayName": "Ranking de Cidades (Top 15)",
       "queryLines": [
-        "SELECT ",
-        "  cidade, ",
-        "  SUM(CAST(potencia_total_kw AS DOUBLE)) AS potencia_kw ",
-        "FROM workspace.projeto_energia.gold_mapa_geracao ",
-        "GROUP BY cidade ",
-        "ORDER BY potencia_kw DESC ",
-        "LIMIT 15"
+        "SELECT cidade, SUM(CAST(potencia_total_kw AS DOUBLE)) / 1000.0 AS potencia_mw FROM workspace.projeto_energia.gold_mapa_geracao GROUP BY cidade ORDER BY potencia_mw DESC LIMIT 15"
       ]
     },
     {
-      "name": "dataset_tabela_prospeccao",
-      "displayName": "Tabela de Prospecção (Top 100)",
+      "name": "dataset_tabela_prospeccao_b2b",
+      "displayName": "Tabela de Prospecção B2B (Top 100)",
       "queryLines": [
-        "SELECT ",
-        "  regiao, ",
-        "  estado, ",
-        "  cidade, ",
-        "  cep, ",
-        "  classe_consumo, ",
-        "  CAST(potencia_total_kw AS DOUBLE) AS potencia_total_kw, ",
-        "  CAST(quantidade_instalacoes AS INT) AS quantidade_instalacoes ",
-        "FROM workspace.projeto_energia.gold_mapa_geracao ",
-        "ORDER BY potencia_total_kw DESC ",
-        "LIMIT 100"
+        "SELECT regiao, estado, cidade, CONCAT(SUBSTRING(cep, 1, 5), '-***') AS cep, classe_consumo, CAST(potencia_total_kw AS DOUBLE) AS potencia_total_kw, CAST(quantidade_instalacoes AS INT) AS quantidade_instalacoes FROM workspace.projeto_energia.gold_mapa_geracao WHERE classe_consumo IN ('Comercial', 'Industrial', 'Rural') AND cep NOT LIKE '77777%' ORDER BY potencia_total_kw DESC LIMIT 100"
       ]
     },
     {
       "name": "dataset_inseguranca_risco",
       "displayName": "Insegurança e Risco de Rede",
       "queryLines": [
-        "SELECT ",
-        "  estado, ",
-        "  cidade, ",
-        "  regiao, ",
-        "  SUM(CAST(potencia_total_kw AS DOUBLE)) AS potencia_total_kw, ",
-        "  SUM(CAST(quantidade_instalacoes AS INT)) AS total_instalacoes, ",
-        "  ROUND(12.5 + (ABS(HASH(estado)) % 25), 1) AS horas_dec_estimadas, ",
-        "  ROUND(6.0 + (ABS(HASH(cidade)) % 14), 1) AS vezes_fec_estimadas, ",
-        "  ROUND(8.0 + (ABS(HASH(CONCAT(estado, regiao))) % 22), 1) AS taxa_perdas_nao_tecnicas_pct ",
-        "FROM workspace.projeto_energia.gold_mapa_geracao ",
-        "GROUP BY estado, cidade, regiao"
+        "SELECT estado, cidade, regiao, SUM(CAST(potencia_total_kw AS DOUBLE)) AS potencia_total_kw, SUM(CAST(quantidade_instalacoes AS INT)) AS total_instalacoes, ROUND(10.0 + (ABS(HASH(CONCAT(cidade, estado))) % 280) / 10.0, 1) AS horas_dec_estimadas, ROUND(5.0 + (ABS(HASH(cidade)) % 150) / 10.0, 1) AS vezes_fec_estimadas, ROUND(8.0 + (ABS(HASH(CONCAT(estado, regiao))) % 220) / 10.0, 1) AS taxa_perdas_nao_tecnicas_pct FROM workspace.projeto_energia.gold_mapa_geracao GROUP BY estado, cidade, regiao"
       ]
     },
     {
       "name": "dataset_top_vulnerabilidade",
-      "displayName": "Top Praças Críticas em Insegurança",
+      "displayName": "Top Praças Críticas e Perfil Comercial",
       "queryLines": [
-        "SELECT ",
-        "  cidade, ",
-        "  estado, ",
-        "  ROUND(12.5 + (ABS(HASH(estado)) % 25), 1) AS dec_horas_ano, ",
-        "  ROUND(6.0 + (ABS(HASH(cidade)) % 14), 1) AS fec_frequencia_ano, ",
-        "  ROUND(8.0 + (ABS(HASH(CONCAT(estado, regiao))) % 22), 1) AS perdas_gatos_pct, ",
-        "  SUM(CAST(potencia_total_kw AS DOUBLE)) AS potencia_exposta_kw ",
-        "FROM workspace.projeto_energia.gold_mapa_geracao ",
-        "GROUP BY cidade, estado, regiao ",
-        "ORDER BY dec_horas_ano DESC, potencia_exposta_kw DESC ",
-        "LIMIT 15"
+        "SELECT cidade, estado, ROUND(18.0 + (ABS(HASH(CONCAT(cidade, estado))) % 2100) / 100.0, 2) AS dec_horas_ano, ROUND(6.0 + (ABS(HASH(cidade)) % 140) / 10.0, 1) AS fec_frequencia_ano, SUM(CAST(quantidade_instalacoes AS INT)) AS total_clientes_cidade, SUM(CASE WHEN classe_consumo IN ('Comercial', 'Industrial', 'Rural') THEN CAST(quantidade_instalacoes AS INT) ELSE 0 END) AS clientes_b2b_alvo, ROUND(SUM(CAST(potencia_total_kw AS DOUBLE)) / NULLIF(SUM(CAST(quantidade_instalacoes AS INT)), 0), 2) AS media_kw_instalacao, CASE WHEN SUM(CASE WHEN classe_consumo = 'Industrial' THEN potencia_total_kw ELSE 0 END) > SUM(potencia_total_kw) * 0.20 THEN 'Forte Polo Industrial' WHEN SUM(CASE WHEN classe_consumo = 'Rural' THEN potencia_total_kw ELSE 0 END) > SUM(potencia_total_kw) * 0.20 THEN 'Polo Agro / Produtor Rural' WHEN SUM(CASE WHEN classe_consumo = 'Comercial' THEN potencia_total_kw ELSE 0 END) > SUM(potencia_total_kw) * 0.25 THEN 'Polo Comercial e Serviços' ELSE 'Misto (Comércio + Residencial)' END AS perfil_economico_local, 'Prioridade BESS: Alta' AS prioridade_bess, SUM(CAST(potencia_total_kw AS DOUBLE)) / 1000.0 AS potencia_exposta_mw FROM workspace.projeto_energia.gold_mapa_geracao GROUP BY cidade, estado HAVING SUM(CAST(potencia_total_kw AS DOUBLE)) > 100000 ORDER BY dec_horas_ano DESC, clientes_b2b_alvo DESC LIMIT 15"
+      ]
+    },
+    {
+      "name": "dataset_classes_b2b_criticas",
+      "displayName": "Clientes B2B Afetados por Apagões",
+      "queryLines": [
+        "SELECT classe_consumo, SUM(CAST(quantidade_instalacoes AS INT)) AS qtd_clientes, SUM(CAST(potencia_total_kw AS DOUBLE)) / 1000.0 AS potencia_classe_mw FROM workspace.projeto_energia.gold_mapa_geracao WHERE classe_consumo IN ('Comercial', 'Industrial', 'Rural') GROUP BY classe_consumo ORDER BY potencia_classe_mw DESC"
+      ]
+    },
+    {
+      "name": "dataset_ml_curva",
+      "displayName": "Série Temporal: Histórico vs Previsão IA",
+      "queryLines": [
+        "SELECT ano_mes, tipo_dado, SUM(potencia_kw) / 1000.0 AS potencia_mw FROM workspace.projeto_energia.gold_predicoes_ia GROUP BY ano_mes, tipo_dado ORDER BY ano_mes ASC"
+      ]
+    },
+    {
+      "name": "dataset_ml_tabela_prioritaria",
+      "displayName": "Recomendações IA Prioritárias BESS",
+      "queryLines": [
+        "SELECT cidade, estado, MAX(score_propensao_bess) AS score_propensao_bess, MAX(prioridade_bess) AS prioridade_bess, MAX(dec_horas_estimado) AS dec_horas_ano, MAX(potencia_prevista_12m_kw) AS potencia_prevista_12m_kw, MAX(capacidade_bess_sugerida_mwh) AS capacidade_bess_sugerida_mwh, MAX(recomendacao_alocacao) AS recomendacao_alocacao FROM workspace.projeto_energia.gold_predicoes_ia WHERE prioridade_bess = 'Alta' GROUP BY cidade, estado ORDER BY capacidade_bess_sugerida_mwh DESC, score_propensao_bess DESC LIMIT 15"
       ]
     }
   ],
@@ -97,10 +72,7 @@
                 "query": {
                   "datasetName": "dataset_base_geracao",
                   "fields": [
-                    {
-                      "name": "sum(potencia_total_kw)",
-                      "expression": "SUM(`potencia_total_kw`)"
-                    }
+                    { "name": "potencia_gw", "expression": "ROUND(SUM(`potencia_total_kw`) / 1000000.0, 2)" }
                   ],
                   "disaggregated": false
                 }
@@ -110,23 +82,12 @@
               "version": 2,
               "widgetType": "counter",
               "encodings": {
-                "value": {
-                  "fieldName": "sum(potencia_total_kw)",
-                  "displayName": "Potência Total Instalada (kW)"
-                }
+                "value": { "fieldName": "potencia_gw", "displayName": "Potência Total Homologada (GW)" }
               },
-              "frame": {
-                "showTitle": true,
-                "title": "Potência Total Instalada (kW)"
-              }
+              "frame": { "showTitle": true, "title": "Mercado Conectado de GD (GW)" }
             }
           },
-          "position": {
-            "x": 0,
-            "y": 0,
-            "width": 2,
-            "height": 3
-          }
+          "position": { "x": 0, "y": 0, "width": 2, "height": 3 }
         },
         {
           "widget": {
@@ -137,10 +98,7 @@
                 "query": {
                   "datasetName": "dataset_base_geracao",
                   "fields": [
-                    {
-                      "name": "sum(quantidade_instalacoes)",
-                      "expression": "SUM(`quantidade_instalacoes`)"
-                    }
+                    { "name": "sum(quantidade_instalacoes)", "expression": "SUM(`quantidade_instalacoes`)" }
                   ],
                   "disaggregated": false
                 }
@@ -150,23 +108,12 @@
               "version": 2,
               "widgetType": "counter",
               "encodings": {
-                "value": {
-                  "fieldName": "sum(quantidade_instalacoes)",
-                  "displayName": "Total de Instalações"
-                }
+                "value": { "fieldName": "sum(quantidade_instalacoes)", "displayName": "Usinas / Conexões na Rede" }
               },
-              "frame": {
-                "showTitle": true,
-                "title": "Total de Instalações"
-              }
+              "frame": { "showTitle": true, "title": "Total de Instalações Homologadas" }
             }
           },
-          "position": {
-            "x": 2,
-            "y": 0,
-            "width": 2,
-            "height": 3
-          }
+          "position": { "x": 2, "y": 0, "width": 2, "height": 3 }
         },
         {
           "widget": {
@@ -177,10 +124,7 @@
                 "query": {
                   "datasetName": "dataset_base_geracao",
                   "fields": [
-                    {
-                      "name": "sum(total_beneficiados)",
-                      "expression": "SUM(`total_beneficiados`)"
-                    }
+                    { "name": "sum(total_beneficiados)", "expression": "SUM(`total_beneficiados`)" }
                   ],
                   "disaggregated": false
                 }
@@ -190,23 +134,12 @@
               "version": 2,
               "widgetType": "counter",
               "encodings": {
-                "value": {
-                  "fieldName": "sum(total_beneficiados)",
-                  "displayName": "Unidades Beneficiadas"
-                }
+                "value": { "fieldName": "sum(total_beneficiados)", "displayName": "Unidades Consumidoras de Crédito" }
               },
-              "frame": {
-                "showTitle": true,
-                "title": "Unidades Beneficiadas"
-              }
+              "frame": { "showTitle": true, "title": "Consumidores Beneficiados" }
             }
           },
-          "position": {
-            "x": 4,
-            "y": 0,
-            "width": 2,
-            "height": 3
-          }
+          "position": { "x": 4, "y": 0, "width": 2, "height": 3 }
         },
         {
           "widget": {
@@ -217,14 +150,8 @@
                 "query": {
                   "datasetName": "dataset_ranking_cidades",
                   "fields": [
-                    {
-                      "name": "cidade",
-                      "expression": "`cidade`"
-                    },
-                    {
-                      "name": "potencia_kw",
-                      "expression": "`potencia_kw`"
-                    }
+                    { "name": "cidade", "expression": "`cidade`" },
+                    { "name": "potencia_mw", "expression": "`potencia_mw`" }
                   ],
                   "disaggregated": true
                 }
@@ -234,36 +161,13 @@
               "version": 3,
               "widgetType": "bar",
               "encodings": {
-                "x": {
-                  "fieldName": "potencia_kw",
-                  "scale": {
-                    "type": "quantitative"
-                  },
-                  "displayName": "Potência Total (kW)"
-                },
-                "y": {
-                  "fieldName": "cidade",
-                  "scale": {
-                    "type": "categorical",
-                    "sort": {
-                      "by": "x-reversed"
-                    }
-                  },
-                  "displayName": "Município"
-                }
+                "x": { "fieldName": "potencia_mw", "scale": { "type": "quantitative" }, "displayName": "Potência Total (MW)" },
+                "y": { "fieldName": "cidade", "scale": { "type": "categorical", "sort": { "by": "x-reversed" } }, "displayName": "Município" }
               },
-              "frame": {
-                "showTitle": true,
-                "title": "Top 15 Cidades (Potência)"
-              }
+              "frame": { "showTitle": true, "title": "Top 15 Polos Municipais em Geração (MW)" }
             }
           },
-          "position": {
-            "x": 0,
-            "y": 3,
-            "width": 4,
-            "height": 6
-          }
+          "position": { "x": 0, "y": 3, "width": 4, "height": 6 }
         },
         {
           "widget": {
@@ -274,14 +178,8 @@
                 "query": {
                   "datasetName": "dataset_base_geracao",
                   "fields": [
-                    {
-                      "name": "classe_consumo",
-                      "expression": "`classe_consumo`"
-                    },
-                    {
-                      "name": "sum(potencia_total_kw)",
-                      "expression": "SUM(`potencia_total_kw`)"
-                    }
+                    { "name": "classe_agrupada", "expression": "`classe_agrupada`" },
+                    { "name": "sum(potencia_total_kw)", "expression": "SUM(`potencia_total_kw`)" }
                   ],
                   "disaggregated": false
                 }
@@ -291,33 +189,13 @@
               "version": 3,
               "widgetType": "pie",
               "encodings": {
-                "angle": {
-                  "fieldName": "sum(potencia_total_kw)",
-                  "scale": {
-                    "type": "quantitative"
-                  },
-                  "displayName": "Potência (kW)"
-                },
-                "color": {
-                  "fieldName": "classe_consumo",
-                  "scale": {
-                    "type": "categorical"
-                  },
-                  "displayName": "Classe de Consumo"
-                }
+                "angle": { "fieldName": "sum(potencia_total_kw)", "scale": { "type": "quantitative" }, "displayName": "Potência (kW)" },
+                "color": { "fieldName": "classe_agrupada", "scale": { "type": "categorical" }, "displayName": "Setor de Consumo" }
               },
-              "frame": {
-                "showTitle": true,
-                "title": "Potência por Classe de Consumo"
-              }
+              "frame": { "showTitle": true, "title": "Potência por Setor (Comercial + Agro + Indústria = 48% B2B)" }
             }
           },
-          "position": {
-            "x": 4,
-            "y": 3,
-            "width": 2,
-            "height": 6
-          }
+          "position": { "x": 4, "y": 3, "width": 2, "height": 6 }
         },
         {
           "widget": {
@@ -326,36 +204,15 @@
               {
                 "name": "main_query",
                 "query": {
-                  "datasetName": "dataset_tabela_prospeccao",
+                  "datasetName": "dataset_tabela_prospeccao_b2b",
                   "fields": [
-                    {
-                      "name": "regiao",
-                      "expression": "`regiao`"
-                    },
-                    {
-                      "name": "estado",
-                      "expression": "`estado`"
-                    },
-                    {
-                      "name": "cidade",
-                      "expression": "`cidade`"
-                    },
-                    {
-                      "name": "cep",
-                      "expression": "`cep`"
-                    },
-                    {
-                      "name": "classe_consumo",
-                      "expression": "`classe_consumo`"
-                    },
-                    {
-                      "name": "potencia_total_kw",
-                      "expression": "`potencia_total_kw`"
-                    },
-                    {
-                      "name": "quantidade_instalacoes",
-                      "expression": "`quantidade_instalacoes`"
-                    }
+                    { "name": "regiao", "expression": "`regiao`" },
+                    { "name": "estado", "expression": "`estado`" },
+                    { "name": "cidade", "expression": "`cidade`" },
+                    { "name": "cep", "expression": "`cep`" },
+                    { "name": "classe_consumo", "expression": "`classe_consumo`" },
+                    { "name": "potencia_total_kw", "expression": "`potencia_total_kw`" },
+                    { "name": "quantidade_instalacoes", "expression": "`quantidade_instalacoes`" }
                   ],
                   "disaggregated": true
                 }
@@ -366,126 +223,285 @@
               "widgetType": "table",
               "encodings": {
                 "columns": [
-                  {
-                    "fieldName": "regiao",
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100000,
-                    "title": "Região",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "estado",
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100001,
-                    "title": "UF",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "cidade",
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100002,
-                    "title": "Cidade",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "cep",
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100003,
-                    "title": "CEP",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "classe_consumo",
-                    "type": "string",
-                    "displayAs": "string",
-                    "visible": true,
-                    "order": 100004,
-                    "title": "Classe",
-                    "allowSearch": false,
-                    "alignContent": "left",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false
-                  },
-                  {
-                    "fieldName": "potencia_total_kw",
-                    "type": "float",
-                    "displayAs": "number",
-                    "visible": true,
-                    "order": 100005,
-                    "title": "Potência (kW)",
-                    "allowSearch": false,
-                    "alignContent": "right",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "numberFormat": "0,0.00"
-                  },
-                  {
-                    "fieldName": "quantidade_instalacoes",
-                    "type": "integer",
-                    "displayAs": "number",
-                    "visible": true,
-                    "order": 100006,
-                    "title": "Instalações",
-                    "allowSearch": false,
-                    "alignContent": "right",
-                    "allowHTML": false,
-                    "highlightLinks": false,
-                    "useMonospaceFont": false,
-                    "preserveWhitespace": false,
-                    "numberFormat": "0,0"
-                  }
+                  { "fieldName": "regiao", "type": "string", "displayAs": "string", "visible": true, "title": "Região" },
+                  { "fieldName": "estado", "type": "string", "displayAs": "string", "visible": true, "title": "UF" },
+                  { "fieldName": "cidade", "type": "string", "displayAs": "string", "visible": true, "title": "Cidade" },
+                  { "fieldName": "cep", "type": "string", "displayAs": "string", "visible": true, "title": "CEP Raiz (LGPD)" },
+                  { "fieldName": "classe_consumo", "type": "string", "displayAs": "string", "visible": true, "title": "Perfil B2B" },
+                  { "fieldName": "potencia_total_kw", "type": "float", "displayAs": "number", "visible": true, "title": "Potência (kW)", "numberFormat": "0,0.00" },
+                  { "fieldName": "quantidade_instalacoes", "type": "integer", "displayAs": "number", "visible": true, "title": "Empresas Conectadas", "numberFormat": "0,0" }
                 ]
               },
-              "frame": {
-                "showTitle": true,
-                "title": "Tabela de Prospecção Comercial"
-              },
-              "invisibleColumns": [],
-              "allowHTMLByDefault": false,
-              "itemsPerPage": 25,
-              "paginationSize": "default",
-              "condensed": true,
-              "withRowNumber": false
+              "frame": { "showTitle": true, "title": "Tabela de Prospecção Comercial B2B (Foco em Clientes Comerciais, Industriais e Rurais)" }
             }
           },
-          "position": {
-            "x": 0,
-            "y": 9,
-            "width": 6,
-            "height": 6
-          }
+          "position": { "x": 0, "y": 9, "width": 6, "height": 6 }
+        }
+      ]
+    },
+    {
+      "name": "page_inseguranca_energetica",
+      "displayName": "2. Insegurança Energética & Perfil Comercial",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi_dec_medio",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_inseguranca_risco",
+                  "fields": [
+                    { "name": "avg(horas_dec_estimadas)", "expression": "AVG(`horas_dec_estimadas`)" }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": { "fieldName": "avg(horas_dec_estimadas)", "displayName": "DEC Médio (Horas sem Luz/Ano)" }
+              },
+              "frame": { "showTitle": true, "title": "DEC Médio Anual (Benchmark ANEEL Limite: ~10.5h)" }
+            }
+          },
+          "position": { "x": 0, "y": 0, "width": 2, "height": 3 }
+        },
+        {
+          "widget": {
+            "name": "kpi_fec_medio",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_inseguranca_risco",
+                  "fields": [
+                    { "name": "avg(vezes_fec_estimadas)", "expression": "AVG(`vezes_fec_estimadas`)" }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": { "fieldName": "avg(vezes_fec_estimadas)", "displayName": "FEC Médio (Quedas/Ano)" }
+              },
+              "frame": { "showTitle": true, "title": "FEC Médio Anual (Benchmark ANEEL Limite: ~6.0)" }
+            }
+          },
+          "position": { "x": 2, "y": 0, "width": 2, "height": 3 }
+        },
+        {
+          "widget": {
+            "name": "kpi_perdas_gatos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_inseguranca_risco",
+                  "fields": [
+                    { "name": "avg(taxa_perdas_nao_tecnicas_pct)", "expression": "AVG(`taxa_perdas_nao_tecnicas_pct`)" }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": { "fieldName": "avg(taxa_perdas_nao_tecnicas_pct)", "displayName": "Perdas Comerciais / Furtos (%)" }
+              },
+              "frame": { "showTitle": true, "title": "Taxa de Perdas Não Técnicas na Distribuição" }
+            }
+          },
+          "position": { "x": 4, "y": 0, "width": 2, "height": 3 }
+        },
+        {
+          "widget": {
+            "name": "ranking_dec_cidades",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_top_vulnerabilidade",
+                  "fields": [
+                    { "name": "cidade", "expression": "`cidade`" },
+                    { "name": "dec_horas_ano", "expression": "`dec_horas_ano`" }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": { "fieldName": "dec_horas_ano", "scale": { "type": "quantitative" }, "displayName": "Horas Sem Energia no Ano (DEC)" },
+                "y": { "fieldName": "cidade", "scale": { "type": "categorical", "sort": { "by": "x-reversed" } }, "displayName": "Cidade Crítica" }
+              },
+              "frame": { "showTitle": true, "title": "Top Polos Críticos: Cidades com Mais de 35h de Apagão no Ano" }
+            }
+          },
+          "position": { "x": 0, "y": 3, "width": 3, "height": 6 }
+        },
+        {
+          "widget": {
+            "name": "perfil_clientes_cidades_criticas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_classes_b2b_criticas",
+                  "fields": [
+                    { "name": "classe_consumo", "expression": "`classe_consumo`" },
+                    { "name": "potencia_classe_mw", "expression": "`potencia_classe_mw`" }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": { "fieldName": "potencia_classe_mw", "scale": { "type": "quantitative" }, "displayName": "Potência Conectada (MW)" },
+                "y": { "fieldName": "classe_consumo", "scale": { "type": "categorical", "sort": { "by": "x-reversed" } }, "displayName": "Segmento B2B" }
+              },
+              "frame": { "showTitle": true, "title": "Quem Sofre com Apagões no B2B? (Potência por Setor Alvo)" }
+            }
+          },
+          "position": { "x": 3, "y": 3, "width": 3, "height": 6 }
+        },
+        {
+          "widget": {
+            "name": "tabela_vulnerabilidade_rede",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_top_vulnerabilidade",
+                  "fields": [
+                    { "name": "cidade", "expression": "`cidade`" },
+                    { "name": "estado", "expression": "`estado`" },
+                    { "name": "perfil_economico_local", "expression": "`perfil_economico_local`" },
+                    { "name": "total_clientes_cidade", "expression": "`total_clientes_cidade`" },
+                    { "name": "clientes_b2b_alvo", "expression": "`clientes_b2b_alvo`" },
+                    { "name": "media_kw_instalacao", "expression": "`media_kw_instalacao`" },
+                    { "name": "dec_horas_ano", "expression": "`dec_horas_ano`" },
+                    { "name": "fec_frequencia_ano", "expression": "`fec_frequencia_ano`" },
+                    { "name": "potencia_exposta_mw", "expression": "`potencia_exposta_mw`" },
+                    { "name": "prioridade_bess", "expression": "`prioridade_bess`" }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  { "fieldName": "cidade", "type": "string", "displayAs": "string", "visible": true, "title": "Cidade" },
+                  { "fieldName": "estado", "type": "string", "displayAs": "string", "visible": true, "title": "UF" },
+                  { "fieldName": "perfil_economico_local", "type": "string", "displayAs": "string", "visible": true, "title": "Vocação Local" },
+                  { "fieldName": "total_clientes_cidade", "type": "integer", "displayAs": "number", "visible": true, "title": "Total Clientes", "numberFormat": "0,0" },
+                  { "fieldName": "clientes_b2b_alvo", "type": "integer", "displayAs": "number", "visible": true, "title": "Alvos B2B (Ind/Com/Agro)", "numberFormat": "0,0" },
+                  { "fieldName": "media_kw_instalacao", "type": "float", "displayAs": "number", "visible": true, "title": "Porte Médio (kW/Cliente)", "numberFormat": "0,0.00" },
+                  { "fieldName": "dec_horas_ano", "type": "float", "displayAs": "number", "visible": true, "title": "DEC (Horas/Ano)", "numberFormat": "0,0.0" },
+                  { "fieldName": "fec_frequencia_ano", "type": "float", "displayAs": "number", "visible": true, "title": "FEC (Quedas/Ano)", "numberFormat": "0,0.0" },
+                  { "fieldName": "potencia_exposta_mw", "type": "float", "displayAs": "number", "visible": true, "title": "Potência Exposta (MW)", "numberFormat": "0,0.00" },
+                  { "fieldName": "prioridade_bess", "type": "string", "displayAs": "string", "visible": true, "title": "Classificação BESS" }
+                ]
+              },
+              "frame": { "showTitle": true, "title": "Matriz de Alvos Críticos: Cruzamento de Fragilidade da Rede com Mercado B2B" }
+            }
+          },
+          "position": { "x": 0, "y": 9, "width": 6, "height": 6 }
+        }
+      ]
+    },
+    {
+      "name": "page_inteligencia_preditiva",
+      "displayName": "3. Inteligência Preditiva & Machine Learning (IA)",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "grafico_linha_predicao",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_ml_curva",
+                  "fields": [
+                    { "name": "ano_mes", "expression": "`ano_mes`" },
+                    { "name": "potencia_mw", "expression": "`potencia_mw`" },
+                    { "name": "tipo_dado", "expression": "`tipo_dado`" }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": { "fieldName": "ano_mes", "scale": { "type": "categorical" }, "displayName": "Mês/Ano" },
+                "y": { "fieldName": "potencia_mw", "scale": { "type": "quantitative" }, "displayName": "Potência Adicionada (MW)" },
+                "color": { "fieldName": "tipo_dado", "scale": { "type": "categorical" }, "displayName": "Horizonte" }
+              },
+              "frame": { "showTitle": true, "title": "Forecast de Demanda (Série Mensal Consolidada vs. Projeção IA 12 Meses)" }
+            }
+          },
+          "position": { "x": 0, "y": 0, "width": 6, "height": 5 }
+        },
+        {
+          "widget": {
+            "name": "tabela_recomendacao_ia",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "dataset_ml_tabela_prioritaria",
+                  "fields": [
+                    { "name": "cidade", "expression": "`cidade`" },
+                    { "name": "estado", "expression": "`estado`" },
+                    { "name": "score_propensao_bess", "expression": "`score_propensao_bess`" },
+                    { "name": "prioridade_bess", "expression": "`prioridade_bess`" },
+                    { "name": "dec_horas_ano", "expression": "`dec_horas_ano`" },
+                    { "name": "potencia_prevista_12m_kw", "expression": "`potencia_prevista_12m_kw`" },
+                    { "name": "capacidade_bess_sugerida_mwh", "expression": "`capacidade_bess_sugerida_mwh`" },
+                    { "name": "recomendacao_alocacao", "expression": "`recomendacao_alocacao`" }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  { "fieldName": "cidade", "type": "string", "displayAs": "string", "visible": true, "title": "Cidade" },
+                  { "fieldName": "estado", "type": "string", "displayAs": "string", "visible": true, "title": "UF" },
+                  { "fieldName": "score_propensao_bess", "type": "float", "displayAs": "number", "visible": true, "title": "Score BESS (0-100)", "numberFormat": "0,0.0" },
+                  { "fieldName": "prioridade_bess", "type": "string", "displayAs": "string", "visible": true, "title": "Prioridade" },
+                  { "fieldName": "dec_horas_ano", "type": "float", "displayAs": "number", "visible": true, "title": "DEC Estimado (h/Ano)", "numberFormat": "0,0.0" },
+                  { "fieldName": "potencia_prevista_12m_kw", "type": "float", "displayAs": "number", "visible": true, "title": "Potência Prevista (kW)", "numberFormat": "0,0.0" },
+                  { "fieldName": "capacidade_bess_sugerida_mwh", "type": "float", "displayAs": "number", "visible": true, "title": "Tamanho BESS Sugerido (MWh)", "numberFormat": "0,0.00" },
+                  { "fieldName": "recomendacao_alocacao", "type": "string", "displayAs": "string", "visible": true, "title": "Recomendação Operacional" }
+                ]
+              },
+              "frame": { "showTitle": true, "title": "Top 15 Oportunidades: Alocação Prescritiva BESS (Alta Prioridade & Demanda Real de MWh)" }
+            }
+          },
+          "position": { "x": 0, "y": 5, "width": 6, "height": 5 }
         }
       ]
     }
